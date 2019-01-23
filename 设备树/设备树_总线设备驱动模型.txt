@@ -1,0 +1,35 @@
+insmod device或drive后，总线会到driver链表或device链表中遍历
+通过比较platform_driver.id_table->name和platform_device.name
+  或比较platform_driver.name和platform_device.name
+来看有没有match的driver或者device
+若match，则调用porbe函数注册对应的设备，建立设备文件
+	
+	insmod led_drv.ko
+		module_init(myled_init);
+			static int myled_init(void) > platform_driver_register(&led_drv);
+				struct platform_driver led_drv = {
+					.probe		= led_probe,
+						根据platform_device的资源进行ioremap
+						注册设备
+						建立设备文件
+					.remove		= led_remove,
+						和.probe的反操作
+					.driver		= {
+						.name	= "myled",
+					}
+				};
+				
+			
+	insmod led_dev.ko
+		module_init(led_dev_init);
+			platform_device_register(&led_dev);
+				struct platform_device led_dev = {
+					.name         = "myled",
+					.id       = -1,
+					.num_resources    = ARRAY_SIZE(led_resource),
+					.resource     = led_resource,
+						这是一个struct resource类型的数组，其中每一项资源成员为.start/.end/.flags
+					.dev = { 
+						.release = led_release, 
+					},
+				};

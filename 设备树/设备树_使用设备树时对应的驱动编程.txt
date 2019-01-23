@@ -1,0 +1,33 @@
+引进设备树相当于把之前insmod device的操作通过dtb来让uboot在启动的时候来做
+	dts编译成dtb
+	uboot装载dtb，生成device_node
+	根据device_node生成platform_device
+		cd sys/devices/platform/xxxx/of_node/
+			该目录下包含dts中描述的属性：compatible name reg
+			
+/* 驱动 */ 
+module_init(myled_init);
+	platform_driver_register(&led_drv)
+		struct platform_driver led_drv = {
+			.probe		= led_probe,
+				注册设备，建立设备节点
+			.remove		= led_remove,
+			.driver		= {
+				.name	= "myled",
+				.of_match_table = of_match_leds, /* 能支持哪些来自于dts的platform_device */	
+					"来自dts的platform_device结构体" 与 "我们写的platform_driver" 的匹配过程:
+					"来自dts的platform_device结构体"里面有成员".dev.of_node", 它里面含有各种属性, 比如 compatible, reg, pin
+					"我们写的platform_driver"里面有成员".driver.of_match_table", 它表示能支持哪些来自于dts的platform_device
+					如果"of_node中的compatible" 跟 "of_match_table中的compatible" 一致, 就表示匹配成功, 则调用 platform_driver中的probe函数;
+					在probe函数中, 可以继续从of_node中获得各种属性来确定硬件资源 > of_property_read_s32(pdev->dev.of_node, "pin", &led_pin);
+			}
+		};
+		
+		
+/* dts */
+	#define S3C2410_GPF(_nr)	((5<<16) + (_nr))
+
+	led {
+		compatible = "jz2440_led";
+		pin = <S3C2410_GPF(5)>;
+	};
