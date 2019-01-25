@@ -1,0 +1,8 @@
+busybox源码阅读
+
+init.c>init_main
+	parse_inittab()
+		尝试加载配置文件/etc/inittab，若该文件不存在，加载默认配置
+		new_init_action > 添加一个init_action结构体到action链表中
+	
+		
