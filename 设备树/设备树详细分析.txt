@@ -293,7 +293,7 @@ b. 内核中有多个machine_desc,
 
 c. 使用compatile属性的值, 
    跟
-   每一个machine_desc.dt_compat
+   每一个machine_desc.dt_compat //在arch\arm\mach-xxxx中描述
    比较,
    成绩为"吻合的compatile属性值的位置",
    
@@ -304,20 +304,19 @@ c. 使用compatile属性的值,
 start_kernel // init/main.c
     setup_arch(&command_line);  // arch/arm/kernel/setup.c
         mdesc = setup_machine_fdt(__atags_pointer);  // arch/arm/kernel/devtree.c
-                    early_init_dt_verify(phys_to_virt(dt_phys)  // 判断是否有效的dtb, drivers/of/ftd.c
-                                    initial_boot_params = params;
-                    mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);  // 找到最匹配的machine_desc, drivers/of/ftd.c
-                                    while ((data = get_next_compat(&compat))) {
-                                        score = of_flat_dt_match(dt_root, compat);
-                                        if (score > 0 && score < best_score) {
-                                            best_data = data;
-                                            best_score = score;
-                                        }
-                                    }
-                    
+			early_init_dt_verify(phys_to_virt(dt_phys)  // 判断是否有效的dtb, drivers/of/ftd.c
+				initial_boot_params = params;
+			mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);  // 找到最匹配的machine_desc, drivers/of/ftd.c
+				while ((data = get_next_compat(&compat))) {
+					score = of_flat_dt_match(dt_root, compat);
+					if (score > 0 && score < best_score) {
+						best_data = data;
+						best_score = score;
+					}
+				}           
         machine_desc = mdesc;
 
-        
+          
         
 第03节_对设备树中运行时配置信息的处理
 
@@ -367,13 +366,13 @@ start_kernel // init/main.c
                 
                 /* Second pass, do actual unflattening */
                 unflatten_dt_nodes(blob, mem, dad, mynodes);
-                    populate_node
+                    populate_node // 循环调用建立device_node链表，用于创建单个节点
                         np = unflatten_dt_alloc(mem, sizeof(struct device_node) + allocl,
                                     __alignof__(struct device_node));
                         
                         np->full_name = fn = ((char *)np) + sizeof(*np);
                         
-                        populate_properties
+                        populate_properties//填入各种属性值，建立properties链表
                                 pp = unflatten_dt_alloc(mem, sizeof(struct property),
                                             __alignof__(struct property));
                             
@@ -504,50 +503,54 @@ start_kernel     // init/main.c
                                 do_initcalls();
                                     for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
                                         do_initcall_level(level);  // 比如 do_initcall_level(3)
-                                                                               for (fn = initcall_levels[3]; fn < initcall_levels[3+1]; fn++)
-                                                                                    do_one_initcall(initcall_from_entry(fn));  // 就是调用"arch_initcall_sync(fn)"中定义的fn函数
+										   for (fn = initcall_levels[3]; fn < initcall_levels[3+1]; fn++)
+												do_one_initcall(initcall_from_entry(fn));  // 就是调用"arch_initcall_sync(fn)"中定义的fn函数
 
 b. of_platform_default_populate_init  (drivers/of/platform.c) 生成platform_device的过程:
 of_platform_default_populate_init
     of_platform_default_populate(NULL, NULL, NULL);
-        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL)
+        of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL)//of_default_bus_match_table存放的是总线节点的子节点将会被转换成platform_device的compatible列表
             for_each_child_of_node(root, child) {
                 rc = of_platform_bus_create(child, matches, lookup, parent, true);  // 调用过程看下面
-                            dev = of_device_alloc(np, bus_id, parent);   // 根据device_node节点的属性设置platform_device的resource
+					dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);  // 生成bus节点的platform_device结构体
+						dev = of_device_alloc(np, bus_id, parent);   // 根据device_node节点的属性设置platform_device的resource
+					if (!dev || !of_match_node(matches, bus))  // 如果bus节点的compatile属性不吻合matches成表, 就不处理它的子节点
+						return 0;
+					for_each_child_of_node(bus, child) {    // 取出每一个子节点
+						pr_debug("   create child: %pOF\n", child);
+						rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);   // 处理它的子节点, of_platform_bus_create是一个递归调用
+						if (rc) {
+							of_node_put(child);
+							break;
+						}
+					}
                 if (rc) {
                     of_node_put(child);
                     break;
                 }
             }
             
-c. of_platform_bus_create(bus, matches, ...)的调用过程(处理bus节点生成platform_devie, 并决定是否处理它的子节点):
-        dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);  // 生成bus节点的platform_device结构体
-        if (!dev || !of_match_node(matches, bus))  // 如果bus节点的compatile属性不吻合matches成表, 就不处理它的子节点
-            return 0;
-
-        for_each_child_of_node(bus, child) {    // 取出每一个子节点
-            pr_debug("   create child: %pOF\n", child);
-            rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);   // 处理它的子节点, of_platform_bus_create是一个递归调用
-            if (rc) {
-                of_node_put(child);
-                break;
-            }
-        }
         
-d. I2C总线节点的处理过程:
+c. I2C总线节点的处理过程:
    /i2c节点一般表示i2c控制器, 它会被转换为platform_device, 在内核中有对应的platform_driver;
-   platform_driver的probe函数中会调用i2c_add_numbered_adapter:
-   
-   i2c_add_numbered_adapter   // drivers/i2c/i2c-core-base.c
-        __i2c_add_numbered_adapter
-            i2c_register_adapter
-                of_i2c_register_devices(adap);   // drivers/i2c/i2c-core-of.c
-                    for_each_available_child_of_node(bus, node) {
-                        client = of_i2c_register_device(adap, node);
-                                        client = i2c_new_device(adap, &info);   // 设备树中的i2c子节点被转换为i2c_client
-                    }
+   platform_driver的probe函数中会调用i2c_add_adapter:
+.probe
+   i2c_add_adapter   // drivers/i2c/i2c-core.c
+		i2c_register_adapter
+			of_i2c_register_devices(adap);   // drivers/i2c/i2c-core-of.c
+				for_each_available_child_of_node(bus, node) {
+					client = of_i2c_register_device(adap, node);
+						client = i2c_new_device(adap, &info);   // 设备树中的i2c子节点被转换为i2c_client
+							device_register(&client->dev);//注册设备
+								//和device_create的区别和联系？
+								device_add(dev);
+									bus_add_device(dev);
+										device_add_attrs
+											device_create_file
+												sysfs_create_file
+				}
                     
-e. SPI总线节点的处理过程:
+d. SPI总线节点的处理过程:
    /spi节点一般表示spi控制器, 它会被转换为platform_device, 在内核中有对应的platform_driver;
    platform_driver的probe函数中会调用spi_register_master, 即spi_register_controller:
    
@@ -567,8 +570,8 @@ e. SPI总线节点的处理过程:
 drivers/base/platform.c
 
 a. 注册 platform_driver 的过程:
-platform_driver_register
-    __platform_driver_register
+platform_driver_register 
+    __platform_driver_register /* /drivers/base/platform.c */ 
         drv->driver.probe = platform_drv_probe;
         driver_register
             bus_add_driver
@@ -594,7 +597,7 @@ platform_device_register
             bus_probe_device(dev);
                 device_initial_probe
                     __device_attach
-                        ret = bus_for_each_drv(dev->bus, NULL, &data, __device_attach_driver); // // 对于plarform_bus_type下的每一个driver, 调用 __device_attach_driver
+                        ret = bus_for_each_drv(dev->bus, NULL, &data, __device_attach_driver); // 对于plarform_bus_type下的每一个driver, 调用 __device_attach_driver
                                     __device_attach_driver
                                         ret = driver_match_device(drv, dev);
                                                     return drv->bus->match ? drv->bus->match(dev, drv) : 1;  // 调用platform_bus_type.match

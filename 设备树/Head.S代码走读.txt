@@ -1,0 +1,30 @@
+/*Head.S代码走读 */
+
+__lookup_processor_type 
+	adr	r3, __lookup_processor_type_data @ 将__lookup_processor_type_data的地址读取到r3寄存器中
+		__lookup_processor_type_data:
+			.long	.
+			.long	__proc_info_begin
+			.long	__proc_info_end
+			.size	__lookup_processor_type_data, . - __lookup_processor_type_data
+	ldmia	r3, {r4 - r6} 	@ 将从3寄存器指向的地址读出数据到r4~r6
+	sub	r3, r3, r4			@ get offset between virt&phys
+	add	r5, r5, r3			@ convert virt addresses to
+	add	r6, r6, r3			@ physical address space
+1:	ldmia	r5, {r3, r4}	@ value, mask
+	and	r4, r4, r9			@ mask wanted bits
+	teq	r3, r4				@ 若匹配，则返回，此时r5寄存器中存储对应的proc_info_list结构体
+	beq	2f 
+	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
+	cmp	r5, r6				@ 自增，若proc_info未遍历结束，则继续进行比较。
+	blo	1b
+	mov	r5, #0				@ unknown processor
+2:	ret	lr @ 返回，存储对应的proc_info_list结构体至r5寄存器中
+
+__lookup_processor_type @ 使用汇编指令读取CPU ID, 根据该ID找到对应的proc_info_list结构体(里面含有这类CPU的初始化函数、信息)
+__vet_atags             @ 判断是否存在可用的ATAGS或DTB
+__create_page_tables    @ 创建页表, 即创建虚拟地址和物理地址的映射关系
+__enable_mmu            @ 使能MMU, 以后就要使用虚拟地址了
+__mmap_switched        	@ 上述函数里将会调用__mmap_switched
+	@把bootloader传入的r2参数, 保存到变量__atags_pointer中
+	@调用C函数start_kernel
