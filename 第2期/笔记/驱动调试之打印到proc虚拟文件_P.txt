@@ -1,0 +1,18 @@
+加载Mymsg.c驱动
+	mymsg_init
+		/* 创造一个文件映射 */
+		myentry = create_proc_entry("mymsg", S_IRUSR, &proc_root);
+		myentry->proc_fops = &proc_mymsg_operations;//设置文件操作符
+		
+加载First_drv驱动	
+	first_drv_init
+		创建设备文件/dev/xyz
+		初始化led相关的寄存器
+	调用myprintk函数
+	
+打开应用程序Firstdrvtest
+	打开设备文件/dev/xyz
+cat proc/mymsg
+	调用了file_operations.read函数,这个函数将读该文件的内容到buf中，打印buf的内容
+		若环形缓冲区中有数据，__put_user(c, buf++);//一个个取出内容到buf中
+			
