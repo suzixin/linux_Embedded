@@ -1,0 +1,10 @@
+开发板uboot命令执行分析
+问题：
+getenv中的值是在哪里设定的？
+
+main_loop
+	abortboot
+		printf("Hit any key to stop autoboot: %2d ", bootdelay);
+		若倒计时内有键按下，将全局变量gd->flags的GD_FLG_SILENT位置0，返回1
+	获取环境变量menucmd中的命令并执行，环境变量menucmd中存放的命令是menu，对应处理函数是do_menu，该函数是等待输入的死循环，若输入q，则直接return退出
+	
