@@ -1,0 +1,85 @@
+selinux
+
+ls -Z
+	查看文件的安全上下文
+ps -eZ
+	查看进程的安全上下文
+tail /var/log/cron
+	查看启动cron相关的日志
+getenforce
+	查看selinux的启用状态
+setenforce 
+	设置selinux的状态
+	
+
+sestatus [-vb]
+	查看 SELinux 的政策 （Policy）
+	选项与参数：
+	-v  ：检查列于 /etc/sestatus.conf 内的文件与程序的安全性本文内容；
+	-b  ：将目前政策的规则布林值列出，亦即某些规则 （rule） 是否要启动 （0/1） 之意；
+sestatus
+	输出概览信息
+vim /etc/selinux/config
+	修改selinux配置文件
+getsebool	
+	SELinux各个规则的布林值查询
+	getsebool [-a] [规则的名称]
+	选项与参数：
+	-a  ：列出目前系统上面的所有 SELinux 规则的布林值为打开或关闭值
+getsebool httpd_enable_homedirs
+	查询httpd_enable_homedirs 这个规则的状态
+setsebool -P httpd_enable_homedirs 1
+	修改httpd_enable_homedirs规则设置其bool值为1
+seinfo [-Atrub]
+-A  ：列出 SELinux 的状态、规则布林值、身份识别、角色、类别等所有信息
+-u  ：列出 SELinux 的所有身份识别 （user） 种类
+-r  ：列出 SELinux 的所有角色 （role） 种类
+-t  ：列出 SELinux 的所有类别 （type） 种类
+-b  ：列出所有规则的种类 （布林值）
+seinfo
+	概览
+sesearch [-A] [-s 主体类别] [-t 目标类别] [-b 布林值]
+	对selinux政策进行检索
+sesearch -A -s crond_t &#124; grep spool
+	找出crond_t能读取的文件：system_cron_spool_t 
+sesearch -A -s crond_t &#124; grep admin_home_t
+	找出 crond_t 是否能够读取admin_home_t
+sesearch -A -b httpd_enable_homedirs
+	列出 httpd_enable_homedirs 这个规则当中，主体程序能够读取的文件 SELinux type
+semanage boolean -l
+	查看所有规则类型的名称、状态、默认状态、描述信息
+	SELinux boolean    State  Default Description
+semanage fcontext -l &#124; grep -E '^/etc &#124;^/etc/cron'
+	semanage 默认目录的安全性本文查询与修改
+semanage fcontext -a -t system_cron_spool_t "/srv/mycron（/.*）?"
+	将 mycron 默认值改为 system_cron_spool_t 啰！
+
+/*使用 restorecon 让文件恢复正确的 SELinux type*/
+restorecon [-Rv] 文件或目录
+选项与参数：
+-R  ：连同次目录一起修改；
+-v  ：将过程显示到屏幕上
+
+restorecon -Rv /etc/cron.d
+	将 /etc/cron.d/ 下面的文件通通恢复成默认的 SELinux type！
+
+/*使用 chcon 手动修改文件的 SELinux type*/
+chcon [-R] [-t type] [-u user] [-r role] 文件
+chcon [-R] --reference=范例档 文件
+选项与参数：
+-R  ：连同该目录下的次目录也同时修改；
+-t  ：后面接安全性本文的类型字段！例如 httpd_sys_content_t ；
+-u  ：后面接身份识别，例如 system_u； （不重要）
+-r  ：后面街角色，例如 system_r；     （不重要）
+-v  ：若有变化成功，请将变动的结果列出来
+--reference=范例档：拿某个文件当范例来修改后续接的文件的类型！
+
+chcon -v -t net_conf_t /etc/cron.d/checktime
+	修改/etc/cron.d/checktime的类型为net_conf_t
+chcon -v --reference=/etc/shadow /etc/cron.d/checktime	
+	直接以 /etc/shadow SELinux type 套用到 /etc/cron.d/checktime 上！
+
+
+
+	
+	
