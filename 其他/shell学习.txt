@@ -1,0 +1,144 @@
+SHELL学习
+
+/* 命令行基本原理 */
+ -> 一个程序：/bin/bash
+调用过程分析
+/sbin/getty
+	/bin/login
+		/bin/bash
+		
+     fork     execve         execve         fork           execve
+init --> init --> /sbin/getty --> /bin/login --> /bin/login --> /bin/bash
+
+分析方法：
+在root下使用strace命令查看程序调用过程
+其背后的unix基本概念有待分析
+
+/sbin/init -> linux默认启动的第一个程序，通过 /etc/inittab 配置
+
+/etc/inittab 的语法
+	id:runlevels:action:process
+	runlevels 是运行级别
+		0 is halt.
+		1 is single-user.
+		2-5 are multi-user.
+		6 is reboot.
+	action 是动作
+		initdefault：用来指定系统启动后进入的运行级别
+		sysinit：指定那些在系统启动时将被执行的程序
+		wait：当进入某个特别的运行级别时，指定的程序将被执行一次，init 将等到它执行完成
+		ctrlaltdel，当 init 程序接收到 SIGINT 信号时（通常通过按下 CTRL+ALT+DEL，这个默认情况下将给 init 发送一个 SIGINT 信号），某个指定的程序将被执行
+		respawn：这个指定的进程将被重启，任何时候当它退出时。
+
+
+特殊字符是如何解析的：|, >, <, &
+| 管道
+> 输出重定向至某文件中
+< 输入重定向自某文件，即将某文件用作输入
+& 后台运行
+
+
+脚本的运行
+chmod +x test.sh
+./ test.sh
+
+source test.sh
+bash test.sh
+. test.sh
+
+helloworld 程序
+#!/bin/bash -v //-v 打印程序的源代码
+# test.sh
+echo "Hello, World"
+
+
+/*shell脚本的调试*/
+1. 使用trap命令
+在shell脚本中输出调试信息
+
+使用trap命令，基本语法:
+trap 'command' signal
+	信号名(signal)	何时产生
+	EXIT			从一个函数中退出或整个脚本执行完毕
+	ERR				当一条命令返回非零状态时(代表命令执行不成功)
+	DEBUG			脚本中每一条命令执行之前
+#显示程序运行轨迹
+trap 'echo “before execute line:$LINENO, a=$a,b=$b,c=$c”' DEBUG
+#显示返回非零信息
+trap 'ERRTRAP $LINENO' ERR
+	ERRTRAP()
+	{
+	  echo "[LINE:$1] Error: Command or function exited with status $?"
+	}
+
+2. 使用tee命令
+在管道之间插入一个tee命令查看传输的中间值
+
+3. 使用宏控制的调试命令
+DEBUG()
+{
+if [ "$DEBUG" = "true" ]; then
+    $@　　
+fi
+}
+a=1
+DEBUG echo "a=$a"
+if [ "$a" -eq 1 ]
+then
+     b=2
+else
+     b=1
+fi
+DEBUG echo "b=$b"
+c=3
+DEBUG echo "c=$c"
+
+4.使用shell的执行选项
+-n 只读取shell脚本，但不实际执行
+-x 进入跟踪方式，显示所执行的每一条命令
+	可以在脚本中使用-x选项
+	set -x　　　 #启动"-x"选项 
+	要跟踪的程序段 
+	set +x　　　　 #关闭"-x"选项
+	
+	可以通过设置PS4来选择 -x 输出的内容
+	export PS4='+{$LINENO:${FUNCNAME[0]}} '
+-c "string" 从strings中读取命令
+
+
+/* 语法 */
+
+特殊变量列表
+变量	含义
+$0	当前脚本的文件名
+$n	传递给脚本或函数的参数。n 是一个数字，表示第几个参数。例如，第一个参数是$1，第二个参数是$2。
+$#	传递给脚本或函数的参数个数。
+$*	传递给脚本或函数的所有参数。
+$@	传递给脚本或函数的所有参数。被双引号(" ")包含时，与 $* 稍有不同，下面将会讲到。
+$?	上个命令的退出状态，或函数的返回值。
+$$	当前Shell进程ID。对于 Shell 脚本，就是这些脚本所在的进程ID。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
